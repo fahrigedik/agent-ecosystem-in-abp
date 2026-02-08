@@ -9,7 +9,11 @@ using AgentEcosystem.Localization;
 using AgentEcosystem.Menus;
 using AgentEcosystem.Permissions;
 using AgentEcosystem.HealthChecks;
+using AgentEcosystem.A2A;
+using AgentEcosystem.Agents;
+using AgentEcosystem.McpTools;
 using OpenIddict.Validation.AspNetCore;
+using Microsoft.SemanticKernel;
 using System;
 using Volo.Abp;
 using Volo.Abp.Studio;
@@ -182,6 +186,11 @@ public class AgentEcosystemModule : AbpModule
         ConfigureLocalization();
         ConfigureNavigationServices();
         ConfigureEfCore(context);
+        
+        // ═══════════════════════════════════════════════════════
+        // AI AGENT ECOSYSTEM SERVİS KAYITLARI
+        // ═══════════════════════════════════════════════════════
+        ConfigureAgentEcosystem(context, configuration);
         
         Configure<RazorPagesOptions>(options =>
         {
@@ -356,6 +365,102 @@ public class AgentEcosystemModule : AbpModule
             });
         });
         
+    }
+
+    /// <summary>
+    /// AI Agent Ecosystem servislerini yapılandırır.
+    /// 
+    /// ┌──────────────────────────────────────────────────────────┐
+    /// │                  KATMAN MİMARİSİ                        │
+    /// │                                                          │
+    /// │  ┌──────────────────┐                                    │
+    /// │  │ IChatClient (GPT) │ ← Microsoft.Extensions.AI         │
+    /// │  └────────┬─────────┘                                    │
+    /// │           │                                              │
+    /// │  ┌────────▼─────────────────────────────────────┐       │
+    /// │  │            MCP ARAÇLARI                       │       │
+    /// │  │  WebSearch │ FileSystem │ Database            │       │
+    /// │  └────────┬─────────────────────────────────────┘       │
+    /// │           │                                              │
+    /// │  ┌────────▼─────────────────────────────────────┐       │
+    /// │  │         AJANLAR (ADK Pattern)                 │       │
+    /// │  │  ResearcherAgent │ AnalysisAgent              │       │
+    /// │  └────────┬─────────────────────────────────────┘       │
+    /// │           │                                              │
+    /// │  ┌────────▼─────────────────────────────────────┐       │
+    /// │  │    A2A SERVER + ORCHESTRATOR                  │       │
+    /// │  │  A2AServer │ ResearchOrchestrator             │       │
+    /// │  └──────────────────────────────────────────────┘       │
+    /// └──────────────────────────────────────────────────────────┘
+    /// </summary>
+    private void ConfigureAgentEcosystem(
+        ServiceConfigurationContext context,
+        IConfiguration configuration)
+    {
+        var services = context.Services;
+
+        // ─── 1. SEMANTIC KERNEL ───
+        // Semantic Kernel, LLM etkileşimlerini yöneten Microsoft'un AI orchestration framework'üdür.
+        // IChatCompletionService arayüzü üzerinden Azure OpenAI, OpenAI vb. ile konuşur.
+        // Öncelik sırası: Azure OpenAI → OpenAI → SimulatedChatClient (demo)
+
+        var azureEndpoint = configuration["AzureAI:Endpoint"] ?? "";
+        var azureApiKey = configuration["AzureAI:ApiKey"] ?? "";
+        var azureModel = configuration["AzureAI:ModelName"] ?? "gpt-5.2-chat";
+
+        var openAiApiKey = configuration["OpenAI:ApiKey"] ?? "";
+        var openAiModel = configuration["OpenAI:Model"] ?? "gpt-4o";
+
+        if (!string.IsNullOrEmpty(azureEndpoint) && !string.IsNullOrEmpty(azureApiKey))
+        {
+            // Semantic Kernel + Azure OpenAI (GPT 5.2 Chat)
+            var kernelBuilder = services.AddKernel();
+            services.AddAzureOpenAIChatCompletion(
+                deploymentName: azureModel,
+                endpoint: azureEndpoint,
+                apiKey: azureApiKey);
+        }
+        else if (!string.IsNullOrEmpty(openAiApiKey) && openAiApiKey != "YOUR_OPENAI_API_KEY_HERE")
+        {
+            // Semantic Kernel + OpenAI (fallback)
+            var kernelBuilder = services.AddKernel();
+            services.AddOpenAIChatCompletion(
+                modelId: openAiModel,
+                apiKey: openAiApiKey);
+        }
+        else
+        {
+            // API key yoksa Semantic Kernel'i simülasyon servisi ile kullan (demo/geliştirme)
+            services.AddSingleton<Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService>(
+                new AgentEcosystem.Agents.SimulatedChatCompletionService());
+            services.AddKernel();
+        }
+
+        // ─── 2. HTTP İSTEMCİSİ (WebSearch için) ───
+        services.AddHttpClient("WebSearch", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "AgentEcosystem/1.0");
+        });
+
+        // ─── 3. MCP ARAÇLARI ───
+        // Model Context Protocol araçları — LLM'lerin dış dünya ile etkileşim noktaları
+        services.AddTransient<McpWebSearchTools>();
+        services.AddTransient<McpFileSystemTools>();
+        services.AddTransient<McpDatabaseTools>();
+
+        // ─── 4. A2A SUNUCUSU ───
+        // Agent-to-Agent protokolü — ajanlar arası iletişim altyapısı
+        services.AddSingleton<A2AServer>();
+
+        // ─── 5. AJANLAR (ADK Pattern) ───
+        // Her ajan IChatClient + MCP araçlarını kullanır
+        services.AddTransient<ResearcherAgent>();
+        services.AddTransient<AnalysisAgent>();
+
+        // ─── 6. ORKESTRATÖR ───
+        // Tüm bileşenleri koordine eden ana servis
+        services.AddTransient<ResearchOrchestrator>();
     }
 
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
