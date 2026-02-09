@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 namespace AgentEcosystem.Agents.Core;
 
 /// <summary>
-/// ADK'nın SequentialAgent'ının .NET uyarlaması.
-/// Alt ajanları tanımlı sırada ardışık olarak çalıştırır.
-/// Bir ajanın çıktısı (state üzerinden) bir sonrakinin girdisi olur.
+/// .NET adaptation of ADK's SequentialAgent.
+/// Runs sub-agents sequentially in a defined order.
+/// One agent's output (via state) becomes the next agent's input.
 /// </summary>
 public class SequentialAgent : BaseAgent
 {
@@ -24,7 +24,7 @@ public class SequentialAgent : BaseAgent
             lastEvent = await subAgent.RunAsync(context, cancellationToken);
             context.Events.Add(lastEvent);
 
-            // State güncellemelerini uygula
+            // Apply state updates
             if (lastEvent.Actions?.StateUpdates != null)
             {
                 foreach (var (key, value) in lastEvent.Actions.StateUpdates)
@@ -33,11 +33,11 @@ public class SequentialAgent : BaseAgent
                 }
             }
 
-            // Escalate kontrolü — erken çıkış (LoopAgent'tan gelen sinyal gibi)
+            // Escalate check — early exit (e.g. signal from LoopAgent)
             if (lastEvent.Actions?.Escalate == true)
                 break;
 
-            // Transfer kontrolü — başka ajana yönlendirme
+            // Transfer check — redirect to another agent
             if (!string.IsNullOrEmpty(lastEvent.Actions?.TransferToAgent))
             {
                 var targetAgent = FindAgent(lastEvent.Actions.TransferToAgent);

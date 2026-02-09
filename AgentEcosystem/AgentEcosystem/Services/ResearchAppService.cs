@@ -12,16 +12,16 @@ using Volo.Abp.Domain.Repositories;
 namespace AgentEcosystem.Services;
 
 /// <summary>
-/// Araştırma Application Service — ABP Auto API Controller ile REST endpoint olur.
+/// Research Application Service — Becomes a REST endpoint via ABP Auto API Controller.
 /// 
-/// ABP'nin ConventionalControllers özelliği sayesinde bu sınıf
-/// otomatik olarak /api/app/research endpoint'ine dönüşür.
+/// Thanks to ABP's ConventionalControllers feature, this class is
+/// automatically mapped to the /api/app/research endpoint.
 /// 
-/// Endpoint'ler:
-///   POST /api/app/research/execute    → Yeni araştırma başlat
-///   GET  /api/app/research/history    → Geçmiş araştırmaları listele
-///   GET  /api/app/research/{id}       → Belirli araştırmayı getir
-///   GET  /api/app/research/agent-cards → A2A Agent Card'larını getir
+/// Endpoints:
+///   POST /api/app/research/execute    → Start a new research
+///   GET  /api/app/research/history    → List past research records
+///   GET  /api/app/research/{id}       → Get a specific research record
+///   GET  /api/app/research/agent-cards → Get A2A Agent Cards
 /// </summary>
 public class ResearchAppService : AgentEcosystemAppService
 {
@@ -40,42 +40,42 @@ public class ResearchAppService : AgentEcosystemAppService
     }
 
     /// <summary>
-    /// Yeni araştırma başlatır.
-    /// İki mod destekler:
-    /// - "sequential": ADK SequentialAgent pattern (varsayılan)
-    /// - "a2a": A2A protokolü üzerinden ajan iletişimi
+    /// Starts a new research.
+    /// Supports two modes:
+    /// - "sequential": ADK SequentialAgent pattern (default)
+    /// - "a2a": Agent communication via A2A protocol
     /// </summary>
     public async Task<ResearchResultDto> ExecuteAsync(ResearchRequestDto input)
     {
         _logger.LogInformation(
-            "[API] Araştırma talebi alındı: '{Query}' (Mod: {Mode})",
+            "[API] Research request received: '{Query}' (Mode: {Mode})",
             input.Query, input.Mode);
 
         if (string.IsNullOrWhiteSpace(input.Query))
-            throw new Volo.Abp.UserFriendlyException("Araştırma sorgusu boş olamaz.");
+            throw new Volo.Abp.UserFriendlyException("Research query cannot be empty.");
 
         ResearchResultDto result;
 
         if (input.Mode?.ToLowerInvariant() == "a2a")
         {
-            // A2A protokolü ile çalıştır
+            // Execute via A2A protocol
             result = await _orchestrator.ExecuteResearchViaA2AAsync(input.Query);
         }
         else
         {
-            // ADK SequentialAgent pattern ile çalıştır (varsayılan)
+            // Execute via ADK SequentialAgent pattern (default)
             result = await _orchestrator.ExecuteResearchAsync(input.Query);
         }
 
         _logger.LogInformation(
-            "[API] Araştırma tamamlandı: '{Query}' - {Status} ({ElapsedMs}ms)",
+            "[API] Research completed: '{Query}' - {Status} ({ElapsedMs}ms)",
             input.Query, result.Status, result.ProcessingTimeMs);
 
         return result;
     }
 
     /// <summary>
-    /// Geçmiş araştırmaları listeler.
+    /// Lists past research records.
     /// </summary>
     public async Task<List<ResearchSummaryDto>> GetHistoryAsync()
     {
@@ -99,7 +99,7 @@ public class ResearchAppService : AgentEcosystemAppService
     }
 
     /// <summary>
-    /// Belirli bir araştırma kaydını getirir.
+    /// Gets a specific research record by id.
     /// </summary>
     public async Task<ResearchResultDto?> GetByIdAsync(Guid id)
     {
@@ -118,9 +118,9 @@ public class ResearchAppService : AgentEcosystemAppService
     }
 
     /// <summary>
-    /// A2A Agent Card'larını döner.
-    /// A2A protokolünde /.well-known/agent.json endpoint'inden sunulur.
-    /// İstemciler bu card'ları kullanarak ajanları keşfeder.
+    /// Returns A2A Agent Cards.
+    /// Served from the /.well-known/agent.json endpoint in the A2A protocol.
+    /// Clients discover agents using these cards.
     /// </summary>
     public Task<object> GetAgentCardsAsync()
     {
@@ -128,24 +128,24 @@ public class ResearchAppService : AgentEcosystemAppService
         {
             ResearcherAgent = new
             {
-                Name = "Araştırmacı Ajan",
-                Description = "Web'de arama yaparak bilgi toplayan araştırma ajanı.",
+                Name = "Researcher Agent",
+                Description = "A research agent that gathers information by searching the web.",
                 Url = "https://localhost:44331/a2a/researcher",
                 Version = "1.0.0",
                 Skills = new[]
                 {
-                    new { Id = "web-research", Name = "Web Araştırması", Tags = new[] { "research", "web-search" } }
+                    new { Id = "web-research", Name = "Web Research", Tags = new[] { "research", "web-search" } }
                 }
             },
             AnalysisAgent = new
             {
-                Name = "Analiz Ajanı",
-                Description = "Ham verileri analiz ederek yapılandırılmış sonuçlar üreten analiz ajanı.",
+                Name = "Analysis Agent",
+                Description = "An analysis agent that produces structured results by analyzing raw data.",
                 Url = "https://localhost:44331/a2a/analyst",
                 Version = "1.0.0",
                 Skills = new[]
                 {
-                    new { Id = "data-analysis", Name = "Veri Analizi", Tags = new[] { "analysis", "summarization" } }
+                    new { Id = "data-analysis", Name = "Data Analysis", Tags = new[] { "analysis", "summarization" } }
                 }
             }
         };

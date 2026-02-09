@@ -9,7 +9,7 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
-/* Mimari Kartları */
+/* Architecture Cards */
 .arch-card {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -61,7 +61,7 @@
     color: #ea4335;
 }
 
-/* Sonuç İçerik */
+/* Result Content */
 .result-content {
     max-height: 600px;
     overflow-y: auto;
@@ -98,7 +98,7 @@
     border-color: #e0e0e0;
 }
 
-/* Ajan Olay Kartları */
+/* Agent Event Cards */
 .agent-event {
     background-color: #fafbfc;
     transition: background-color 0.2s;
@@ -107,7 +107,7 @@
     background-color: #f0f4ff;
 }
 
-/* Geçmiş Tablo */
+/* History Table */
 #historyTable .table th {
     font-weight: 600;
     font-size: 13px;
@@ -131,13 +131,13 @@
     box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
 }
 
-/* Badge Stilleri */
+/* Badge Styles */
 .badge {
     font-weight: 500;
     font-size: 12px;
 }
 
-/* Buton */
+/* Button */
 #btnStartResearch {
     min-width: 200px;
     transition: all 0.3s ease;
@@ -147,7 +147,7 @@
     box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
 }
 
-/* Tab Stilleri */
+/* Tab Styles */
 .nav-tabs .nav-link {
     font-size: 14px;
     font-weight: 500;

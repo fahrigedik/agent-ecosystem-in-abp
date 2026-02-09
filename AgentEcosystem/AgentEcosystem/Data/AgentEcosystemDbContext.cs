@@ -16,7 +16,7 @@ namespace AgentEcosystem.Data;
 public class AgentEcosystemDbContext : AbpDbContext<AgentEcosystemDbContext>
 {
     /// <summary>
-    /// Araştırma kayıtları tablosu.
+    /// Research records table.
     /// </summary>
     public DbSet<ResearchRecord> ResearchRecords { get; set; }
     

@@ -12,16 +12,16 @@ using Volo.Abp.Domain.Repositories;
 namespace AgentEcosystem.McpTools;
 
 /// <summary>
-/// MCP Veritabanı Araçları — Model Context Protocol SDK ile entegre.
+/// MCP Database Tools — integrated with Model Context Protocol SDK.
 /// 
-/// [McpServerToolType] attribute'u ile bu sınıf MCP Server tarafından
-/// otomatik olarak keşfedilir ve araç olarak sunulur.
+/// This class is automatically discovered and exposed as tools
+/// by the MCP Server via the [McpServerToolType] attribute.
 /// 
-/// Her metod [McpServerTool] attribute'u ile işaretlenmiştir.
-/// MCP istemcileri (LLM'ler dahil) bu araçları doğrudan çağırabilir.
+/// Each method is marked with the [McpServerTool] attribute.
+/// MCP clients (including LLMs) can call these tools directly.
 /// 
-/// ABP Framework'ün Repository pattern'ını kullanarak
-/// araştırma sonuçlarını veritabanında saklar ve sorgular.
+/// Uses ABP Framework's Repository pattern to store and query
+/// research results in the database.
 /// </summary>
 [McpServerToolType]
 public class McpDatabaseTools
@@ -38,15 +38,15 @@ public class McpDatabaseTools
     }
 
     /// <summary>
-    /// Araştırma sonucunu veritabanına kaydeder.
+    /// Saves a research result to the database.
     /// </summary>
     [McpServerTool(Name = "save_research_to_database")]
-    [Description("Bir araştırma sonucunu veritabanına kaydeder. Query, rawData, analyzedResult ve sources parametrelerini alır.")]
+    [Description("Saves a research result to the database. Takes query, rawData, analyzedResult, and sources parameters.")]
     public async Task<string> SaveResearchAsync(
-        [Description("Araştırma sorgusu")] string query,
-        [Description("Ham araştırma verileri")] string rawData,
-        [Description("Analiz edilmiş sonuç")] string analyzedResult,
-        [Description("Kaynaklar (virgülle ayrılmış)")] string sources)
+        [Description("Research query")] string query,
+        [Description("Raw research data")] string rawData,
+        [Description("Analyzed result")] string analyzedResult,
+        [Description("Sources (comma-separated)")] string sources)
     {
         try
         {
@@ -63,26 +63,26 @@ public class McpDatabaseTools
             var saved = await _repository.InsertAsync(record, autoSave: true);
 
             _logger.LogInformation(
-                "[MCP:Database] Araştırma kaydedildi: {Id} - {Query}",
+                "[MCP:Database] Research saved: {Id} - {Query}",
                 saved.Id, query);
 
-            return $"Araştırma başarıyla kaydedildi. ID: {saved.Id}";
+            return $"Research saved successfully. ID: {saved.Id}";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "[MCP:Database] Araştırma kaydetme hatası: {Query}", query);
-            return $"Hata: {ex.Message}";
+                "[MCP:Database] Error saving research: {Query}", query);
+            return $"Error: {ex.Message}";
         }
     }
 
     /// <summary>
-    /// Geçmiş araştırmaları anahtar kelimeye göre arar.
+    /// Searches past research by keyword.
     /// </summary>
     [McpServerTool(Name = "search_past_research")]
-    [Description("Geçmiş araştırmaları anahtar kelimeye göre arar. Veritabanında sorgu veya sonuç içinde geçen kayıtları döner.")]
+    [Description("Searches past research by keyword. Returns records where the query or result contains the keyword.")]
     public async Task<string> SearchPastResearchAsync(
-        [Description("Aranacak anahtar kelime")] string keyword)
+        [Description("Keyword to search for")] string keyword)
     {
         try
         {
@@ -95,13 +95,13 @@ public class McpDatabaseTools
                 .ToList();
 
             if (!results.Any())
-                return $"'{keyword}' ile ilgili geçmiş araştırma bulunamadı.";
+                return $"No past research found related to '{keyword}'.";
 
             var output = results.Select(r =>
-                $"[{r.Id}] {r.Query} (Durum: {r.Status}, Tarih: {r.CompletedAt:yyyy-MM-dd HH:mm})");
+                $"[{r.Id}] {r.Query} (Status: {r.Status}, Date: {r.CompletedAt:yyyy-MM-dd HH:mm})");
 
             _logger.LogInformation(
-                "[MCP:Database] {Count} geçmiş araştırma bulundu: '{Keyword}'",
+                "[MCP:Database] {Count} past research records found for: '{Keyword}'",
                 results.Count, keyword);
 
             return string.Join("\n", output);
@@ -109,18 +109,18 @@ public class McpDatabaseTools
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "[MCP:Database] Araştırma arama hatası: {Keyword}", keyword);
-            return $"Arama hatası: {ex.Message}";
+                "[MCP:Database] Error searching research: {Keyword}", keyword);
+            return $"Search error: {ex.Message}";
         }
     }
 
     /// <summary>
-    /// Son N araştırmayı getirir.
+    /// Retrieves the last N research records.
     /// </summary>
     [McpServerTool(Name = "get_recent_research")]
-    [Description("Son N araştırmayı listeler. Varsayılan olarak son 5 araştırmayı getirir.")]
+    [Description("Lists the last N research records. Defaults to the last 5 records.")]
     public async Task<string> GetRecentResearchAsync(
-        [Description("Kaç adet araştırma getirileceği (varsayılan: 5)")] int count = 5)
+        [Description("Number of research records to retrieve (default: 5)")] int count = 5)
     {
         try
         {
@@ -131,17 +131,17 @@ public class McpDatabaseTools
                 .ToList();
 
             if (!results.Any())
-                return "Henüz kayıtlı araştırma bulunmuyor.";
+                return "No research records saved yet.";
 
             var output = results.Select(r =>
-                $"[{r.Id}] {r.Query}\n  Durum: {r.Status} | Tarih: {r.CompletedAt:yyyy-MM-dd HH:mm}\n  Özet: {Truncate(r.AnalyzedResult, 200)}");
+                $"[{r.Id}] {r.Query}\n  Status: {r.Status} | Date: {r.CompletedAt:yyyy-MM-dd HH:mm}\n  Summary: {Truncate(r.AnalyzedResult, 200)}");
 
             return string.Join("\n---\n", output);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MCP:Database] Son araştırmaları listeleme hatası");
-            return $"Listeleme hatası: {ex.Message}";
+            _logger.LogError(ex, "[MCP:Database] Error listing recent research");
+            return $"Listing error: {ex.Message}";
         }
     }
 

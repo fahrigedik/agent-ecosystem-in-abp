@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 namespace AgentEcosystem.Agents.Core;
 
 /// <summary>
-/// ADK'nın ParallelAgent'ının .NET uyarlaması.
-/// Alt ajanları eşzamanlı (paralel) olarak çalıştırır.
-/// Her alt ajan aynı AgentContext'i paylaşır; çakışmayı önlemek için
-/// farklı state key'leri kullanılmalıdır.
+/// .NET adaptation of ADK's ParallelAgent.
+/// Runs sub-agents concurrently (in parallel).
+/// Each sub-agent shares the same AgentContext; different state keys
+/// should be used to avoid conflicts.
 /// </summary>
 public class ParallelAgent : BaseAgent
 {
@@ -25,7 +25,7 @@ public class ParallelAgent : BaseAgent
         {
             context.Events.Add(result);
 
-            // Her alt ajanın state güncellemelerini uygula
+            // Apply state updates from each sub-agent
             if (result.Actions?.StateUpdates != null)
             {
                 foreach (var (key, value) in result.Actions.StateUpdates)

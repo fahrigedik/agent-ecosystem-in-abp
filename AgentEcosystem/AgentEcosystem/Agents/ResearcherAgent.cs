@@ -12,20 +12,20 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace AgentEcosystem.Agents;
 
 /// <summary>
-/// Araştırmacı Ajan — GPT destekli web araştırma ajanı.
+/// Researcher Agent — GPT-powered web research agent.
 /// 
-/// ADK'nın LlmAgent kavramının .NET uyarlaması:
-/// - BaseAgent'tan türer (ADK hierarchy)
-/// - IChatClient üzerinden GPT ile konuşur (Microsoft.Extensions.AI)
-/// - MCP araçlarını (WebSearchTools) kullanarak web'de arama yapar
-/// - A2A protokolüyle Analiz Ajanı'na veri gönderir
+/// .NET adaptation of ADK's LlmAgent concept:
+/// - Inherits from BaseAgent (ADK hierarchy)
+/// - Communicates with GPT via IChatClient (Microsoft.Extensions.AI)
+/// - Performs web searches using MCP tools (WebSearchTools)
+/// - Sends data to Analysis Agent via A2A protocol
 /// 
-/// Akış:
-/// 1. Kullanıcı sorusunu alır
-/// 2. MCP WebSearch aracıyla web'de arama yapar
-/// 3. GPT'ye ham sonuçları gönderip "araştırma raporu" ürettirir
-/// 4. Ham veriyi ve raporu AgentContext.State'e yazar
-/// 5. A2A üzerinden Analiz Ajanı'na aktarılır
+/// Flow:
+/// 1. Receives the user query
+/// 2. Searches the web using MCP WebSearch tool
+/// 3. Sends raw results to GPT to produce a "research report"
+/// 4. Writes raw data and the report to AgentContext.State
+/// 5. Passed to the Analysis Agent via A2A
 /// </summary>
 public class ResearcherAgent : BaseAgent
 {
@@ -43,57 +43,57 @@ public class ResearcherAgent : BaseAgent
         _logger = logger;
 
         Name = "ResearcherAgent";
-        Description = "Web'de arama yaparak bilgi toplayan araştırmacı ajan.";
+        Description = "A researcher agent that gathers information by searching the web.";
     }
 
     /// <summary>
-    /// Araştırma görevini çalıştırır.
-    /// ADK'daki _run_async_impl'in karşılığı.
+    /// Executes the research task.
+    /// Equivalent of ADK's _run_async_impl.
     /// </summary>
     public override async Task<AgentEvent> RunAsync(
         AgentContext context,
         CancellationToken cancellationToken = default)
     {
         var query = context.UserQuery;
-        _logger.LogInformation("[ResearcherAgent] Araştırma başlıyor: '{Query}'", query);
+        _logger.LogInformation("[ResearcherAgent] Research starting: '{Query}'", query);
 
         try
         {
-            // === ADIM 1: MCP WebSearch Aracını Kullan ===
-            // MCP protokolünde araçlar (tools) LLM'lerin dış dünya ile
-            // etkileşim kurmasını sağlar. Burada web araması yapılıyor.
-            _logger.LogInformation("[ResearcherAgent] MCP:WebSearch aracı çağrılıyor...");
+            // === STEP 1: Use MCP WebSearch Tool ===
+            // In the MCP protocol, tools enable LLMs to interact with
+            // the external world. Here a web search is performed.
+            _logger.LogInformation("[ResearcherAgent] Calling MCP:WebSearch tool...");
             var searchResults = await _webSearchTools.SearchAsync(query);
 
-            // === ADIM 2: GPT ile Araştırma Raporu Oluştur ===
-            // Microsoft.Extensions.AI'ın IChatClient arayüzü kullanılıyor.
-            // Bu arayüz, OpenAI, Azure OpenAI, Ollama vb. tüm LLM'leri destekler.
+            // === STEP 2: Generate Research Report with GPT ===
+            // Uses the IChatClient interface from Microsoft.Extensions.AI.
+            // This interface supports all LLMs: OpenAI, Azure OpenAI, Ollama, etc.
             var systemPrompt = """
-                Sen uzman bir araştırmacı ajansın. Görevin:
-                1. Verilen arama sonuçlarını dikkatle incele
-                2. En önemli ve güvenilir bilgileri belirle
-                3. Bilgileri kaynaklarıyla birlikte derle
-                4. Yapılandırılmış bir araştırma raporu oluştur
+                You are an expert researcher agent. Your task is to conduct comprehensive research on the given topic using web search tools.
+                1. Carefully examine the provided search results
+                2. Identify the most important and reliable information
+                3. Compile the information along with their sources
+                4. Create a structured research report
                 
-                Raporunda şunları içer:
-                - Ana bulgular (madde madde)
-                - Kaynak bilgileri
-                - Önemli detaylar ve veriler
-                - Varsa çelişkili bilgiler
+                Your report should include:
+                - Key findings (bullet points)
+                - Source information
+                - Important details and data
+                - Conflicting information, if any
                 
-                Türkçe yanıt ver. Akademik ve profesyonel bir ton kullan.
+                Respond in English. Use an academic and professional tone.
                 """;
 
             var userMessage = $"""
-                Araştırma Konusu: {query}
+                Research Topic: {query}
                 
-                Web Arama Sonuçları:
+                Web Search Results:
                 {searchResults}
                 
-                Bu sonuçları analiz et ve kapsamlı bir araştırma raporu hazırla.
+                Analyze these results and prepare a comprehensive research report.
                 """;
 
-            _logger.LogInformation("[ResearcherAgent] Semantic Kernel ile araştırma raporu hazırlatılıyor...");
+            _logger.LogInformation("[ResearcherAgent] Generating research report with Semantic Kernel...");
 
             var chatService = _kernel.GetRequiredService<IChatCompletionService>();
             var history = new ChatHistory();
@@ -104,15 +104,15 @@ public class ResearcherAgent : BaseAgent
                 history,
                 cancellationToken: cancellationToken);
 
-            var researchReport = result.LastOrDefault()?.Content ?? "Araştırma raporu oluşturulamadı.";
+            var researchReport = result.LastOrDefault()?.Content ?? "Failed to generate research report.";
 
             _logger.LogInformation(
-                "[ResearcherAgent] Araştırma raporu hazırlandı ({Length} karakter)",
+                "[ResearcherAgent] Research report prepared ({Length} characters)",
                 researchReport.Length);
 
-            // === ADIM 3: State'e Yaz (ADK Pattern) ===
-            // ADK'da ajanlar arası veri paylaşımı session.state üzerinden yapılır.
-            // Araştırma sonuçları state'e yazılıp bir sonraki ajana aktarılır.
+            // === STEP 3: Write to State (ADK Pattern) ===
+            // In ADK, data sharing between agents is done via session.state.
+            // Research results are written to state and passed to the next agent.
             context.SetState("search_results", searchResults);
             context.SetState("research_report", researchReport);
             context.SetState("research_query", query);
@@ -136,13 +136,13 @@ public class ResearcherAgent : BaseAgent
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[ResearcherAgent] Araştırma hatası: '{Query}'", query);
+            _logger.LogError(ex, "[ResearcherAgent] Research error: '{Query}'", query);
 
             return new AgentEvent
             {
                 Author = Name,
                 Status = "failed",
-                Content = $"Araştırma sırasında hata oluştu: {ex.Message}"
+                Content = $"An error occurred during research: {ex.Message}"
             };
         }
     }

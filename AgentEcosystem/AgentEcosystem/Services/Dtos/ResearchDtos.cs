@@ -4,79 +4,79 @@ using System.Collections.Generic;
 namespace AgentEcosystem.Services.Dtos;
 
 /// <summary>
-/// Araştırma isteği DTO'su.
-/// API'ye gelen araştırma talebinin veri modeli.
+/// Research request DTO.
+/// Data model for the research request coming to the API.
 /// </summary>
 public class ResearchRequestDto
 {
     /// <summary>
-    /// Araştırma sorgusu.
-    /// Örn: "Python'un son sürümündeki yenilikler nedir?"
+    /// Research query.
+    /// E.g.: "What are the new features in the latest version of Python?"
     /// </summary>
     public string Query { get; set; } = string.Empty;
 
     /// <summary>
-    /// Çalışma modu: "sequential" (ADK) veya "a2a" (A2A protokolü).
-    /// Varsayılan: sequential
+    /// Execution mode: "sequential" (ADK) or "a2a" (A2A protocol).
+    /// Default: sequential
     /// </summary>
     public string Mode { get; set; } = "sequential";
 }
 
 /// <summary>
-/// Araştırma sonucu DTO'su.
-/// Tüm pipeline çıktısını içerir.
+/// Research result DTO.
+/// Contains the full pipeline output.
 /// </summary>
 public class ResearchResultDto
 {
-    /// <summary>Oturum kimliği.</summary>
+    /// <summary>Session identifier.</summary>
     public string SessionId { get; set; } = string.Empty;
 
-    /// <summary>Orijinal araştırma sorgusu.</summary>
+    /// <summary>Original research query.</summary>
     public string Query { get; set; } = string.Empty;
 
-    /// <summary>Ham web arama sonuçları.</summary>
+    /// <summary>Raw web search results.</summary>
     public string RawSearchResults { get; set; } = string.Empty;
 
-    /// <summary>Araştırmacı Ajan'ın ürettiği ham araştırma raporu.</summary>
+    /// <summary>Raw research report produced by the Researcher Agent.</summary>
     public string ResearchReport { get; set; } = string.Empty;
 
-    /// <summary>Analiz Ajanı'nın ürettiği final analiz raporu.</summary>
+    /// <summary>Final analysis report produced by the Analysis Agent.</summary>
     public string AnalysisResult { get; set; } = string.Empty;
 
-    /// <summary>Raporun kaydedildiği dosya adı.</summary>
+    /// <summary>File name where the report was saved.</summary>
     public string SavedFileName { get; set; } = string.Empty;
 
-    /// <summary>İşlem durumu: Completed, Failed.</summary>
+    /// <summary>Processing status: Completed, Failed.</summary>
     public string Status { get; set; } = string.Empty;
 
-    /// <summary>Toplam işlem süresi (ms).</summary>
+    /// <summary>Total processing time (ms).</summary>
     public long ProcessingTimeMs { get; set; }
 
-    /// <summary>Pipeline sırasında oluşan ajan olayları.</summary>
+    /// <summary>Agent events generated during the pipeline.</summary>
     public List<AgentEventDto> AgentEvents { get; set; } = new();
 }
 
 /// <summary>
-/// Ajan olay DTO'su.
-/// Pipeline'daki her ajanın ürettiği olayları temsil eder.
+/// Agent event DTO.
+/// Represents events produced by each agent in the pipeline.
 /// </summary>
 public class AgentEventDto
 {
-    /// <summary>Olayı oluşturan ajan adı.</summary>
+    /// <summary>Name of the agent that produced the event.</summary>
     public string Agent { get; set; } = string.Empty;
 
-    /// <summary>Olay durumu: working, completed, failed.</summary>
+    /// <summary>Event status: working, completed, failed.</summary>
     public string Status { get; set; } = string.Empty;
 
-    /// <summary>Olay zamanı.</summary>
+    /// <summary>Event timestamp.</summary>
     public DateTime Timestamp { get; set; }
 
-    /// <summary>İçerik önizlemesi (max 200 karakter).</summary>
+    /// <summary>Content preview (max 200 characters).</summary>
     public string ContentPreview { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Araştırma listesi DTO'su (geçmiş araştırmalar).
+/// Research summary DTO (past research records).
 /// </summary>
 public class ResearchSummaryDto
 {

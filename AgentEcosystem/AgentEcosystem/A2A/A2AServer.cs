@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-// A2A NuGet paketi (global::A2A) ile proje namespace'i (AgentEcosystem.A2A) çakışır.
-// Bu yüzden NuGet paketindeki tiplere global:: ile erişiyoruz.
+// The A2A NuGet package (global::A2A) conflicts with the project namespace (AgentEcosystem.A2A).
+// Therefore we access types from the NuGet package using global:: aliases.
 using A2AAgentCard = global::A2A.AgentCard;
 using A2AAgentTask = global::A2A.AgentTask;
 using A2AAgentTaskStatus = global::A2A.AgentTaskStatus;
@@ -21,18 +21,18 @@ using A2APart = global::A2A.Part;
 namespace AgentEcosystem.A2A;
 
 /// <summary>
-/// A2A Sunucu — Agent-to-Agent protokolünün sunucu tarafı.
+/// A2A Server — the server side of the Agent-to-Agent protocol.
 /// 
-/// Google'ın A2A protokolü, ajanların birbirlerini keşfetmesini (Agent Card),
-/// görev göndermesini (Task) ve sonuç almasını sağlar.
+/// Google's A2A protocol enables agents to discover each other (Agent Card),
+/// send tasks (Task), and receive results.
 /// 
-/// Bu sınıf, A2A sunucusuna gelen görevleri yöneten merkezi bileşendir.
-/// Her ajan kendi Agent Card'ını yayınlar ve görev işleyicisini kaydeder.
+/// This class is the central component that manages incoming tasks for the A2A server.
+/// Each agent publishes its own Agent Card and registers its task handler.
 /// 
-/// A2A Protokol Akışı:
-/// 1. İstemci → GET /.well-known/agent.json → Agent Card alır
-/// 2. İstemci → POST /tasks/send → Görev gönderir  
-/// 3. Sunucu → Görevi işler → Sonuç döner (artifacts)
+/// A2A Protocol Flow:
+/// 1. Client → GET /.well-known/agent.json → Retrieves Agent Card
+/// 2. Client → POST /tasks/send → Sends a task  
+/// 3. Server → Processes task → Returns result (artifacts)
 /// </summary>
 public class A2AServer
 {
@@ -45,19 +45,19 @@ public class A2AServer
     }
 
     /// <summary>
-    /// Görev işleyicisi kaydeder. Her ajan kendi handler'ını kaydeder.
+    /// Registers a task handler. Each agent registers its own handler.
     /// </summary>
     public void RegisterTaskHandler(
         string agentId,
         Func<A2AAgentTask, CancellationToken, Task<A2AAgentTask>> handler)
     {
         _taskHandlers[agentId] = handler;
-        _logger.LogInformation("[A2A:Server] Görev işleyicisi kaydedildi: {AgentId}", agentId);
+        _logger.LogInformation("[A2A:Server] Task handler registered: {AgentId}", agentId);
     }
 
     /// <summary>
-    /// Gelen görevi uygun işleyiciye yönlendirir.
-    /// A2A protokolünün tasks/send endpoint'inin karşılığı.
+    /// Routes the incoming task to the appropriate handler.
+    /// Corresponds to the tasks/send endpoint of the A2A protocol.
     /// </summary>
     public async Task<A2AAgentTask> HandleTaskAsync(
         string agentId,
@@ -66,7 +66,7 @@ public class A2AServer
     {
         if (!_taskHandlers.TryGetValue(agentId, out var handler))
         {
-            _logger.LogWarning("[A2A:Server] İşleyici bulunamadı: {AgentId}", agentId);
+            _logger.LogWarning("[A2A:Server] Handler not found: {AgentId}", agentId);
             task.Status = new A2AAgentTaskStatus
             {
                 State = A2ATaskState.Failed,
@@ -75,13 +75,13 @@ public class A2AServer
                 {
                     Role = A2AMessageRole.Agent,
                     MessageId = Guid.NewGuid().ToString(),
-                    Parts = new List<A2APart> { new A2ATextPart { Text = $"Ajan bulunamadı: {agentId}" } }
+                    Parts = new List<A2APart> { new A2ATextPart { Text = $"Agent not found: {agentId}" } }
                 }
             };
             return task;
         }
 
-        _logger.LogInformation("[A2A:Server] Görev işleniyor: {TaskId} → {AgentId}",
+        _logger.LogInformation("[A2A:Server] Processing task: {TaskId} → {AgentId}",
             task.Id, agentId);
 
         try
@@ -100,12 +100,12 @@ public class A2AServer
                 Timestamp = DateTimeOffset.UtcNow
             };
 
-            _logger.LogInformation("[A2A:Server] Görev tamamlandı: {TaskId}", task.Id);
+            _logger.LogInformation("[A2A:Server] Task completed: {TaskId}", task.Id);
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[A2A:Server] Görev başarısız: {TaskId}", task.Id);
+            _logger.LogError(ex, "[A2A:Server] Task failed: {TaskId}", task.Id);
             task.Status = new A2AAgentTaskStatus
             {
                 State = A2ATaskState.Failed,
@@ -114,7 +114,7 @@ public class A2AServer
                 {
                     Role = A2AMessageRole.Agent,
                     MessageId = Guid.NewGuid().ToString(),
-                    Parts = new List<A2APart> { new A2ATextPart { Text = $"Hata: {ex.Message}" } }
+                    Parts = new List<A2APart> { new A2ATextPart { Text = $"Error: {ex.Message}" } }
                 }
             };
             return task;
@@ -122,13 +122,13 @@ public class A2AServer
     }
 
     /// <summary>
-    /// Araştırmacı Ajan için Agent Card oluşturur.
-    /// A2A protokolünde /.well-known/agent.json endpoint'inden sunulur.
+    /// Creates an Agent Card for the Researcher Agent.
+    /// Served from the /.well-known/agent.json endpoint in the A2A protocol.
     /// </summary>
     public static A2AAgentCard CreateResearcherAgentCard() => new()
     {
-        Name = "Araştırmacı Ajan",
-        Description = "Web'de arama yaparak bilgi toplayan araştırma ajanı.",
+        Name = "Researcher Agent",
+        Description = "A research agent that gathers information by searching the web.",
         Url = "https://localhost:44331/a2a/researcher",
         Version = "1.0.0",
         Capabilities = new A2AAgentCapabilities
@@ -141,20 +141,20 @@ public class A2AServer
             new()
             {
                 Id = "web-research",
-                Name = "Web Araştırması",
-                Description = "Belirtilen konuda web'de arama yapar ve ham veri toplar.",
+                Name = "Web Research",
+                Description = "Searches the web on the specified topic and collects raw data.",
                 Tags = new List<string> { "research", "web-search", "data-collection" }
             }
         }
     };
 
     /// <summary>
-    /// Analiz Ajanı için Agent Card oluşturur.
+    /// Creates an Agent Card for the Analysis Agent.
     /// </summary>
     public static A2AAgentCard CreateAnalysisAgentCard() => new()
     {
-        Name = "Analiz Ajanı",
-        Description = "Ham verileri analiz ederek yapılandırılmış sonuçlar üreten analiz ajanı.",
+        Name = "Analysis Agent",
+        Description = "An analysis agent that analyzes raw data and produces structured results.",
         Url = "https://localhost:44331/a2a/analyst",
         Version = "1.0.0",
         Capabilities = new A2AAgentCapabilities
@@ -167,8 +167,8 @@ public class A2AServer
             new()
             {
                 Id = "data-analysis",
-                Name = "Veri Analizi",
-                Description = "Ham araştırma verilerini analiz eder, özetler ve yapılandırılmış formatta sunar.",
+                Name = "Data Analysis",
+                Description = "Analyzes raw research data, summarizes it, and presents it in a structured format.",
                 Tags = new List<string> { "analysis", "summarization", "structuring" }
             }
         }

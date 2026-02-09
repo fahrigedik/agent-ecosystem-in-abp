@@ -12,18 +12,18 @@ using Microsoft.SemanticKernel.ChatCompletion;
 namespace AgentEcosystem.Agents;
 
 /// <summary>
-/// Analiz Ajanı — GPT destekli veri analiz ajanı.
+/// Analysis Agent — GPT-powered data analysis agent.
 /// 
-/// ADK'nın LlmAgent kavramının .NET uyarlaması:
-/// - Araştırmacı Ajan'dan gelen verileri (State üzerinden) okur
-/// - GPT ile analiz eder, özetler ve yapılandırır
-/// - MCP araçlarıyla (FileSystem, Database) sonuçları kaydeder
-/// - Final sonucu kullanıcıya sunar
+/// .NET adaptation of ADK's LlmAgent concept:
+/// - Reads data from the Researcher Agent (via State)
+/// - Analyzes, summarizes, and structures the data with GPT
+/// - Saves results using MCP tools (FileSystem, Database)
+/// - Presents the final result to the user
 /// 
-/// A2A Akışında Bu Ajan:
-/// - Araştırmacı Ajan'dan A2A task olarak veri alır
-/// - Analiz sonucunu A2A artifact olarak döner
-/// - MCP üzerinden dosya ve veritabanına kaydeder
+/// This Agent in the A2A Flow:
+/// - Receives data as an A2A task from the Researcher Agent
+/// - Returns the analysis result as an A2A artifact
+/// - Saves to file and database via MCP
 /// </summary>
 public class AnalysisAgent : BaseAgent
 {
@@ -44,23 +44,23 @@ public class AnalysisAgent : BaseAgent
         _logger = logger;
 
         Name = "AnalysisAgent";
-        Description = "Araştırma verilerini analiz edip yapılandırılmış sonuç üreten analiz ajanı.";
+        Description = "An analysis agent that analyzes research data and produces structured results.";
     }
 
     /// <summary>
-    /// Analiz görevini çalıştırır.
-    /// State'ten araştırma raporunu okur, analiz eder, kaydeder.
+    /// Executes the analysis task.
+    /// Reads the research report from State, analyzes it, and saves the results.
     /// </summary>
     public override async Task<AgentEvent> RunAsync(
         AgentContext context,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("[AnalysisAgent] Analiz başlıyor...");
+        _logger.LogInformation("[AnalysisAgent] Analysis starting...");
 
         try
         {
-            // === ADIM 1: State'ten Veri Oku (ADK Pattern) ===
-            // Araştırmacı Ajan'ın state'e yazdığı verileri oku
+            // === STEP 1: Read Data from State (ADK Pattern) ===
+            // Read the data written to state by the Researcher Agent
             var query = context.GetState<string>("research_query") ?? context.UserQuery;
             var searchResults = context.GetState<string>("search_results") ?? "";
             var researchReport = context.GetState<string>("research_report") ?? "";
@@ -71,58 +71,58 @@ public class AnalysisAgent : BaseAgent
                 {
                     Author = Name,
                     Status = "failed",
-                    Content = "Analiz edilecek araştırma verisi bulunamadı. " +
-                              "Önce Araştırmacı Ajan çalıştırılmalıdır."
+                    Content = "No research data found for analysis. " +
+                              "The Researcher Agent must be run first."
                 };
             }
 
-            // === ADIM 2: GPT ile Analiz Et ===
+            // === STEP 2: Analyze with GPT ===
             var systemPrompt = """
-                Sen uzman bir analiz ajanısın. Görevin:
-                1. Araştırma raporunu derinlemesine analiz et
-                2. Ana temaları ve kalıpları belirle
-                3. Bilgileri mantıksal bir yapıda düzenle
-                4. Profesyonel bir Markdown raporu oluştur
+                You are an expert analysis agent. Your task is to:
+                1. Perform an in-depth analysis of the research report
+                2. Identify main themes and patterns
+                3. Organize the information in a logical structure
+                4. Create a professional Markdown report
                 
-                Rapor Formatı:
-                # [Konu Başlığı]
+                Report Format:
+                # [Topic Title]
                 
-                ## Yönetici Özeti
-                [Kısa ve öz ana bulgular]
+                ## Executive Summary
+                [Brief and concise key findings]
                 
-                ## Detaylı Analiz
-                ### [Alt Başlık 1]
-                [Detaylı analiz]
+                ## Detailed Analysis
+                ### [Sub-heading 1]
+                [Detailed analysis]
                 
-                ### [Alt Başlık 2]
-                [Detaylı analiz]
+                ### [Sub-heading 2]
+                [Detailed analysis]
                 
-                ## Kaynaklar ve Referanslar
-                [Kaynak listesi]
+                ## Sources and References
+                [Source list]
                 
-                ## Sonuç ve Değerlendirme
-                [Genel değerlendirme ve öneriler]
+                ## Conclusion and Recommendations
+                [Overall assessment and recommendations]
                 
                 ---
-                *Bu rapor AI Agent Ecosystem tarafından otomatik üretilmiştir.*
-                *Araştırmacı Ajan → Analiz Ajanı pipeline'ı ile oluşturulmuştur.*
+                *This report was automatically generated by the AI Agent Ecosystem.*
+                *Created through the Researcher Agent → Analysis Agent pipeline.*
                 
-                Türkçe yanıt ver. Akademik, profesyonel ve anlaşılır bir ton kullan.
+                Respond in English. Use an academic, professional, and clear tone.
                 """;
 
             var userMessage = $"""
-                Araştırma Konusu: {query}
+                Research Topic: {query}
                 
-                Araştırma Raporu:
+                Research Report:
                 {researchReport}
                 
-                Ham Arama Sonuçları:
+                Raw Search Results:
                 {searchResults}
                 
-                Bu verileri analiz et ve yukarıdaki formatta yapılandırılmış bir rapor hazırla.
+                Analyze this data and prepare a structured report in the format above.
                 """;
 
-            _logger.LogInformation("[AnalysisAgent] Semantic Kernel ile analiz raporu hazırlanıyor...");
+            _logger.LogInformation("[AnalysisAgent] Generating analysis report with Semantic Kernel...");
 
             var chatService = _kernel.GetRequiredService<IChatCompletionService>();
             var history = new ChatHistory();
@@ -133,26 +133,26 @@ public class AnalysisAgent : BaseAgent
                 history,
                 cancellationToken: cancellationToken);
 
-            var analysisResult = result.LastOrDefault()?.Content ?? "Analiz raporu oluşturulamadı.";
+            var analysisResult = result.LastOrDefault()?.Content ?? "Failed to generate analysis report.";
 
             _logger.LogInformation(
-                "[AnalysisAgent] Analiz raporu hazırlandı ({Length} karakter)",
+                "[AnalysisAgent] Analysis report prepared ({Length} characters)",
                 analysisResult.Length);
 
-            // === ADIM 3: MCP Araçlarıyla Kaydet ===
-            // MCP protokolü ajanların dış kaynaklara (dosya, DB) erişimini sağlar
+            // === STEP 3: Save with MCP Tools ===
+            // The MCP protocol enables agents to access external resources (file, DB)
 
-            // 3a. Dosyaya kaydet (MCP:FileSystem)
+            // 3a. Save to file (MCP:FileSystem)
             var fileName = $"{SanitizeForFileName(query)}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.md";
             var fileSaveResult = await _fileSystemTools.SaveResearchToFileAsync(fileName, analysisResult);
-            _logger.LogInformation("[AnalysisAgent] MCP:FileSystem sonuç: {Result}", fileSaveResult);
+            _logger.LogInformation("[AnalysisAgent] MCP:FileSystem result: {Result}", fileSaveResult);
 
-            // 3b. Veritabanına kaydet (MCP:Database)
+            // 3b. Save to database (MCP:Database)
             var dbSaveResult = await _databaseTools.SaveResearchAsync(
                 query, searchResults, analysisResult, "web-search");
-            _logger.LogInformation("[AnalysisAgent] MCP:Database sonuç: {Result}", dbSaveResult);
+            _logger.LogInformation("[AnalysisAgent] MCP:Database result: {Result}", dbSaveResult);
 
-            // === ADIM 4: State'e Yaz ve Sonuç Dön ===
+            // === STEP 4: Write to State and Return Result ===
             context.SetState("analysis_result", analysisResult);
             context.SetState("analysis_file", fileName);
             context.SetState("analysis_status", "completed");
@@ -169,20 +169,20 @@ public class AnalysisAgent : BaseAgent
                         ["analysis_result"] = analysisResult,
                         ["analysis_file"] = fileName
                     },
-                    // Escalate = true: Pipeline tamamlandı, üst ajana bildir
+                    // Escalate = true: Pipeline completed, notify parent agent
                     Escalate = true
                 }
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[AnalysisAgent] Analiz hatası");
+            _logger.LogError(ex, "[AnalysisAgent] Analysis error");
 
             return new AgentEvent
             {
                 Author = Name,
                 Status = "failed",
-                Content = $"Analiz sırasında hata oluştu: {ex.Message}"
+                Content = $"An error occurred during analysis: {ex.Message}"
             };
         }
     }

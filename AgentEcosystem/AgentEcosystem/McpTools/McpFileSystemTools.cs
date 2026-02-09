@@ -9,11 +9,11 @@ using ModelContextProtocol.Server;
 namespace AgentEcosystem.McpTools;
 
 /// <summary>
-/// MCP Dosya Sistemi Araçları — Model Context Protocol SDK ile entegre.
+/// MCP File System Tools — integrated with Model Context Protocol SDK.
 /// 
-/// Araştırma sonuçlarını dosya sistemine kaydetmek ve okumak için
-/// MCP araçları sağlar. LLM'ler bu araçları kullanarak
-/// araştırma raporlarını dosya olarak kaydedebilir.
+/// Provides MCP tools for saving and reading research results
+/// to/from the file system. LLMs can use these tools to
+/// save research reports as files.
 /// </summary>
 [McpServerToolType]
 public class McpFileSystemTools
@@ -29,20 +29,20 @@ public class McpFileSystemTools
     }
 
     /// <summary>
-    /// Araştırma sonucunu dosya olarak kaydeder.
+    /// Saves a research result as a file.
     /// </summary>
     [McpServerTool(Name = "save_research_to_file")]
-    [Description("Araştırma sonucunu belirtilen dosya adıyla kaydeder. Markdown formatında kaydetmek önerilir.")]
+    [Description("Saves a research result with the specified file name. Saving in Markdown format is recommended.")]
     public async Task<string> SaveResearchToFileAsync(
-        [Description("Dosya adı (örn: python-yenilikleri.md)")] string fileName,
-        [Description("Dosya içeriği (Markdown formatı önerilir)")] string content)
+        [Description("File name (e.g., python-innovations.md)")] string fileName,
+        [Description("File content (Markdown format recommended)")] string content)
     {
         try
         {
             var safeName = SanitizeFileName(fileName);
             var filePath = Path.Combine(_basePath, safeName);
             
-            // Dosya zaten varsa yeni isim oluştur
+            // If the file already exists, generate a new name
             if (File.Exists(filePath))
             {
                 var nameWithoutExt = Path.GetFileNameWithoutExtension(safeName);
@@ -53,53 +53,53 @@ public class McpFileSystemTools
 
             await File.WriteAllTextAsync(filePath, content);
             
-            _logger.LogInformation("[MCP:FileSystem] Dosya kaydedildi: {FilePath}", filePath);
-            return $"Dosya başarıyla kaydedildi: {safeName}";
+            _logger.LogInformation("[MCP:FileSystem] File saved: {FilePath}", filePath);
+            return $"File saved successfully: {safeName}";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MCP:FileSystem] Dosya kaydetme hatası: {FileName}", fileName);
-            return $"Dosya kaydedilemedi: {ex.Message}";
+            _logger.LogError(ex, "[MCP:FileSystem] Error saving file: {FileName}", fileName);
+            return $"Failed to save file: {ex.Message}";
         }
     }
 
     /// <summary>
-    /// Kaydedilmiş araştırma dosyasını okur.
+    /// Reads a previously saved research file.
     /// </summary>
     [McpServerTool(Name = "read_research_file")]
-    [Description("Daha önce kaydedilmiş bir araştırma dosyasını okur.")]
+    [Description("Reads a previously saved research file.")]
     public async Task<string> ReadResearchFileAsync(
-        [Description("Okunacak dosya adı")] string fileName)
+        [Description("File name to read")] string fileName)
     {
         try
         {
             var filePath = Path.Combine(_basePath, SanitizeFileName(fileName));
             if (!File.Exists(filePath))
-                return $"Dosya bulunamadı: {fileName}";
+                return $"File not found: {fileName}";
 
             var content = await File.ReadAllTextAsync(filePath);
-            _logger.LogInformation("[MCP:FileSystem] Dosya okundu: {FilePath}", filePath);
+            _logger.LogInformation("[MCP:FileSystem] File read: {FilePath}", filePath);
             return content;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MCP:FileSystem] Dosya okuma hatası: {FileName}", fileName);
-            return $"Dosya okunamadı: {ex.Message}";
+            _logger.LogError(ex, "[MCP:FileSystem] Error reading file: {FileName}", fileName);
+            return $"Failed to read file: {ex.Message}";
         }
     }
 
     /// <summary>
-    /// Kayıtlı araştırma dosyalarını listeler.
+    /// Lists saved research files.
     /// </summary>
     [McpServerTool(Name = "list_research_files")]
-    [Description("ResearchResults klasöründeki tüm araştırma dosyalarını listeler.")]
+    [Description("Lists all research files in the ResearchResults folder.")]
     public Task<string> ListResearchFilesAsync()
     {
         try
         {
             var files = Directory.GetFiles(_basePath);
             if (files.Length == 0)
-                return Task.FromResult("Henüz kayıtlı araştırma dosyası bulunmuyor.");
+                return Task.FromResult("No research files saved yet.");
 
             var fileInfos = files.Select(f =>
             {
@@ -107,13 +107,13 @@ public class McpFileSystemTools
                 return $"  - {info.Name} ({info.Length / 1024.0:F1} KB, {info.LastWriteTimeUtc:yyyy-MM-dd HH:mm})";
             });
 
-            _logger.LogInformation("[MCP:FileSystem] {Count} dosya listelendi", files.Length);
-            return Task.FromResult($"Kayıtlı dosyalar ({files.Length} adet):\n{string.Join("\n", fileInfos)}");
+            _logger.LogInformation("[MCP:FileSystem] {Count} files listed", files.Length);
+            return Task.FromResult($"Research files ({files.Length} total):\n{string.Join("\n", fileInfos)}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MCP:FileSystem] Dosya listeleme hatası");
-            return Task.FromResult($"Dosya listeleme hatası: {ex.Message}");
+            _logger.LogError(ex, "[MCP:FileSystem] Error listing files");
+            return Task.FromResult($"Error listing files: {ex.Message}");
         }
     }
 

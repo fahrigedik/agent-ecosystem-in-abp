@@ -4,56 +4,56 @@ using System.Collections.Generic;
 namespace AgentEcosystem.Agents.Core;
 
 /// <summary>
-/// ADK'nın Event kavramının .NET uyarlaması.
-/// Oturum sırasında meydana gelen olayları temsil eder.
+/// .NET adaptation of ADK's Event concept.
+/// Represents events that occur during a session.
 /// </summary>
 public class AgentEvent
 {
     /// <summary>
-    /// Olayı oluşturan ajanın adı.
+    /// Name of the agent that created the event.
     /// </summary>
     public string Author { get; set; } = string.Empty;
 
     /// <summary>
-    /// Olay durumu: working, completed, failed.
+    /// Event status: working, completed, failed.
     /// </summary>
     public string Status { get; set; } = "working";
 
     /// <summary>
-    /// Olay içeriği — ajanın ürettiği metin.
+    /// Event content — text produced by the agent.
     /// </summary>
     public string Content { get; set; } = string.Empty;
 
     /// <summary>
-    /// Olayla ilişkili eylemler (escalate, transfer, state updates).
+    /// Actions associated with the event (escalate, transfer, state updates).
     /// </summary>
     public EventActions? Actions { get; set; }
 
     /// <summary>
-    /// Olayın oluşturulma zamanı.
+    /// Timestamp when the event was created.
     /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>
-/// ADK'nın EventActions kavramının .NET uyarlaması.
-/// Olayla birlikte gerçekleştirilecek eylemleri tanımlar.
+/// .NET adaptation of ADK's EventActions concept.
+/// Defines actions to be performed along with the event.
 /// </summary>
 public class EventActions
 {
     /// <summary>
-    /// true ise akış yukarı ajana (ebeveyn ajana) yükseltilir.
-    /// Loop ajanlarında döngüyü sonlandırmak için kullanılır.
+    /// If true, escalates to the upstream (parent) agent.
+    /// Used to terminate loops in loop agents.
     /// </summary>
     public bool Escalate { get; set; }
 
     /// <summary>
-    /// Belirtilen ajana transfer. LLM-driven delegation için kullanılır.
+    /// Transfer to the specified agent. Used for LLM-driven delegation.
     /// </summary>
     public string? TransferToAgent { get; set; }
 
     /// <summary>
-    /// State'e uygulanacak güncellemeler.
+    /// Updates to be applied to state.
     /// </summary>
     public Dictionary<string, object>? StateUpdates { get; set; }
 }

@@ -368,22 +368,22 @@ public class AgentEcosystemModule : AbpModule
     }
 
     /// <summary>
-    /// AI Agent Ecosystem servislerini yapılandırır.
+    /// Configures AI Agent Ecosystem services.
     /// 
     /// ┌──────────────────────────────────────────────────────────┐
-    /// │                  KATMAN MİMARİSİ                        │
+    /// │                  LAYER ARCHITECTURE                     │
     /// │                                                          │
     /// │  ┌──────────────────┐                                    │
     /// │  │ IChatClient (GPT) │ ← Microsoft.Extensions.AI         │
     /// │  └────────┬─────────┘                                    │
     /// │           │                                              │
     /// │  ┌────────▼─────────────────────────────────────┐       │
-    /// │  │            MCP ARAÇLARI                       │       │
+    /// │  │            MCP TOOLS                         │       │
     /// │  │  WebSearch │ FileSystem │ Database            │       │
     /// │  └────────┬─────────────────────────────────────┘       │
     /// │           │                                              │
     /// │  ┌────────▼─────────────────────────────────────┐       │
-    /// │  │         AJANLAR (ADK Pattern)                 │       │
+    /// │  │         AGENTS (ADK Pattern)                  │       │
     /// │  │  ResearcherAgent │ AnalysisAgent              │       │
     /// │  └────────┬─────────────────────────────────────┘       │
     /// │           │                                              │
@@ -400,9 +400,9 @@ public class AgentEcosystemModule : AbpModule
         var services = context.Services;
 
         // ─── 1. SEMANTIC KERNEL ───
-        // Semantic Kernel, LLM etkileşimlerini yöneten Microsoft'un AI orchestration framework'üdür.
-        // IChatCompletionService arayüzü üzerinden Azure OpenAI, OpenAI vb. ile konuşur.
-        // Öncelik sırası: Azure OpenAI → OpenAI → SimulatedChatClient (demo)
+        // Semantic Kernel is Microsoft's AI orchestration framework that manages LLM interactions.
+        // It communicates with Azure OpenAI, OpenAI, etc. via the IChatCompletionService interface.
+        // Priority order: Azure OpenAI → OpenAI → No LLM (warning)
 
         var azureEndpoint = configuration["AzureAI:Endpoint"] ?? "";
         var azureApiKey = configuration["AzureAI:ApiKey"] ?? "";
@@ -430,36 +430,36 @@ public class AgentEcosystemModule : AbpModule
         }
         else
         {
-            // API key yoksa Semantic Kernel'i simülasyon servisi ile kullan (demo/geliştirme)
-            services.AddSingleton<Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService>(
-                new AgentEcosystem.Agents.SimulatedChatCompletionService());
+            // No API key configured — register a kernel without LLM service
+            // Agents will throw an error at runtime if LLM calls are attempted
             services.AddKernel();
+            // WARNING: No Azure OpenAI or OpenAI API key configured. LLM features will not be available.
         }
 
-        // ─── 2. HTTP İSTEMCİSİ (WebSearch için) ───
+        // ─── 2. HTTP CLIENT (for WebSearch) ───
         services.AddHttpClient("WebSearch", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("User-Agent", "AgentEcosystem/1.0");
         });
 
-        // ─── 3. MCP ARAÇLARI ───
-        // Model Context Protocol araçları — LLM'lerin dış dünya ile etkileşim noktaları
+        // ─── 3. MCP TOOLS ───
+        // Model Context Protocol tools — interaction points between LLMs and the outside world
         services.AddTransient<McpWebSearchTools>();
         services.AddTransient<McpFileSystemTools>();
         services.AddTransient<McpDatabaseTools>();
 
-        // ─── 4. A2A SUNUCUSU ───
-        // Agent-to-Agent protokolü — ajanlar arası iletişim altyapısı
+        // ─── 4. A2A SERVER ───
+        // Agent-to-Agent protocol — inter-agent communication infrastructure
         services.AddSingleton<A2AServer>();
 
-        // ─── 5. AJANLAR (ADK Pattern) ───
-        // Her ajan IChatClient + MCP araçlarını kullanır
+        // ─── 5. AGENTS (ADK Pattern) ───
+        // Each agent uses IChatClient + MCP tools
         services.AddTransient<ResearcherAgent>();
         services.AddTransient<AnalysisAgent>();
 
-        // ─── 6. ORKESTRATÖR ───
-        // Tüm bileşenleri koordine eden ana servis
+        // ─── 6. ORCHESTRATOR ───
+        // Main service that coordinates all components
         services.AddTransient<ResearchOrchestrator>();
     }
 

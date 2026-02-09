@@ -9,7 +9,7 @@ using AgentEcosystem.Agents.Core;
 using AgentEcosystem.Services.Dtos;
 using Microsoft.Extensions.Logging;
 
-// A2A NuGet paketi namespace alias'ları (proje namespace'i ile çakışma önlemi)
+// A2A NuGet package namespace aliases (to avoid collision with project namespace)
 using A2AAgentTask = global::A2A.AgentTask;
 using A2AAgentMessage = global::A2A.AgentMessage;
 using A2AMessageRole = global::A2A.MessageRole;
@@ -20,35 +20,35 @@ using A2APart = global::A2A.Part;
 namespace AgentEcosystem.Agents;
 
 /// <summary>
-/// Araştırma Orkestratörü — Tüm sistemi koordine eden merkezi bileşen.
+/// Research Orchestrator — The central component that coordinates the entire system.
 /// 
-/// Bu sınıf üç protokolü bir arada kullanır:
+/// This class uses three protocols together:
 /// 
 /// 1. ADK (Agent Development Kit) Pattern:
-///    - SequentialAgent ile ajanları sıralı çalıştırır
-///    - AgentContext ile durum yönetimi yapar
-///    - AgentEvent ile olay tabanlı iletişim sağlar
+///    - Runs agents sequentially with SequentialAgent
+///    - Manages state with AgentContext
+///    - Provides event-based communication with AgentEvent
 /// 
-/// 2. A2A (Agent-to-Agent) Protokolü:
-///    - Ajanlar arası görev gönderme (tasks/send)
-///    - Agent Card ile keşif
-///    - Task lifecycle yönetimi
+/// 2. A2A (Agent-to-Agent) Protocol:
+///    - Sending tasks between agents (tasks/send)
+///    - Discovery via Agent Card
+///    - Task lifecycle management
 /// 
 /// 3. MCP (Model Context Protocol):
-///    - Web arama aracı (ResearcherAgent)
-///    - Dosya kaydetme aracı (AnalysisAgent)
-///    - Veritabanı aracı (AnalysisAgent)
+///    - Web search tool (ResearcherAgent)
+///    - File saving tool (AnalysisAgent)
+///    - Database tool (AnalysisAgent)
 /// 
-/// Akış Şeması:
+/// Flow Diagram:
 /// ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-/// │  Kullanıcı   │────▶│ ResearcherAgent   │────▶│ AnalysisAgent │
-/// │  Sorgusu     │     │ (MCP:WebSearch)   │ A2A │ (MCP:File+DB) │
+/// │  User        │────▶│ ResearcherAgent   │────▶│ AnalysisAgent │
+/// │  Query       │     │ (MCP:WebSearch)   │ A2A │ (MCP:File+DB) │
 /// └─────────────┘     └──────────────────┘     └──────────────┘
 ///                              │                        │
 ///                              ▼                        ▼
 ///                     ┌──────────────┐         ┌──────────────┐
-///                     │ Ham Veriler   │         │ Final Rapor   │
-///                     │ (State)       │         │ (Dosya + DB)  │
+///                     │ Raw Data      │         │ Final Report  │
+///                     │ (State)       │         │ (File + DB)   │
 ///                     └──────────────┘         └──────────────┘
 /// </summary>
 public class ResearchOrchestrator
@@ -69,13 +69,13 @@ public class ResearchOrchestrator
         _a2aServer = a2aServer;
         _logger = logger;
 
-        // A2A görev işleyicilerini kaydet
+        // Register A2A task handlers
         RegisterA2AHandlers();
     }
 
     /// <summary>
-    /// A2A görev işleyicilerini kaydeder.
-    /// Her ajan kendi A2A handler'ını sunucuya kaydeder.
+    /// Registers A2A task handlers.
+    /// Each agent registers its own A2A handler with the server.
     /// </summary>
     private void RegisterA2AHandlers()
     {
@@ -111,7 +111,7 @@ public class ResearchOrchestrator
                 UserQuery = ExtractQueryFromTask(task)
             };
 
-            // Ham verileri task mesajlarından context state'e aktar
+            // Transfer raw data from task messages to context state
             var rawData = ExtractDataFromTask(task);
             if (!string.IsNullOrEmpty(rawData))
             {
@@ -138,12 +138,12 @@ public class ResearchOrchestrator
             return task;
         });
 
-        _logger.LogInformation("[Orchestrator] A2A görev işleyicileri kaydedildi.");
+        _logger.LogInformation("[Orchestrator] A2A task handlers registered.");
     }
 
     /// <summary>
-    /// Tam araştırma pipeline'ını çalıştırır.
-    /// ADK SequentialAgent pattern'ı + A2A iletişimi + MCP araçları.
+    /// Runs the full research pipeline.
+    /// ADK SequentialAgent pattern + A2A communication + MCP tools.
     /// </summary>
     public async Task<ResearchResultDto> ExecuteResearchAsync(
         string query,
@@ -153,22 +153,22 @@ public class ResearchOrchestrator
         var sessionId = Guid.NewGuid().ToString();
 
         _logger.LogInformation(
-            "[Orchestrator] ===== Araştırma başlıyor =====\n" +
-            "  Oturum: {SessionId}\n  Sorgu: '{Query}'",
+            "[Orchestrator] ===== Research starting =====\n" +
+            "  Session: {SessionId}\n  Query: '{Query}'",
             sessionId, query);
 
         try
         {
             // ───────────────────────────────────────────────
-            // YÖNTEM 1: ADK SequentialAgent Pattern
+            // METHOD 1: ADK SequentialAgent Pattern
             // ───────────────────────────────────────────────
-            // İki ajanı sıralı çalıştır. İlk ajanın çıktısı
-            // (state üzerinden) ikinci ajanın girdisi olur.
+            // Run two agents sequentially. The first agent's output
+            // (via state) becomes the second agent's input.
 
             var pipeline = new SequentialAgent
             {
                 Name = "ResearchPipeline",
-                Description = "Araştırma → Analiz sıralı pipeline'ı"
+                Description = "Research → Analysis sequential pipeline"
             };
 
             pipeline.AddSubAgent(_researcherAgent);
@@ -180,13 +180,13 @@ public class ResearchOrchestrator
                 UserQuery = query
             };
 
-            _logger.LogInformation("[Orchestrator] ADK SequentialAgent pipeline başlatılıyor...");
+            _logger.LogInformation("[Orchestrator] Starting ADK SequentialAgent pipeline...");
             var finalEvent = await pipeline.RunAsync(context, cancellationToken);
 
             stopwatch.Stop();
 
             // ───────────────────────────────────────────────
-            // SONUÇ DTO'SUNU OLUŞTUR
+            // BUILD RESULT DTO
             // ───────────────────────────────────────────────
             var result = new ResearchResultDto
             {
@@ -210,8 +210,8 @@ public class ResearchOrchestrator
             };
 
             _logger.LogInformation(
-                "[Orchestrator] ===== Araştırma tamamlandı =====\n" +
-                "  Oturum: {SessionId}\n  Süre: {ElapsedMs}ms\n  Durum: {Status}",
+                "[Orchestrator] ===== Research completed =====\n" +
+                "  Session: {SessionId}\n  Duration: {ElapsedMs}ms\n  Status: {Status}",
                 sessionId, stopwatch.ElapsedMilliseconds, result.Status);
 
             return result;
@@ -220,7 +220,7 @@ public class ResearchOrchestrator
         {
             stopwatch.Stop();
             _logger.LogError(ex,
-                "[Orchestrator] Araştırma pipeline hatası: {SessionId}", sessionId);
+                "[Orchestrator] Research pipeline error: {SessionId}", sessionId);
 
             return new ResearchResultDto
             {
@@ -228,14 +228,14 @@ public class ResearchOrchestrator
                 Query = query,
                 Status = "Failed",
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                AnalysisResult = $"Araştırma sırasında hata oluştu: {ex.Message}"
+                AnalysisResult = $"An error occurred during research: {ex.Message}"
             };
         }
     }
 
     /// <summary>
-    /// A2A protokolü üzerinden araştırma çalıştırır.
-    /// Ajanlar arasında görev gönderme ve sonuç alma.
+    /// Runs research via the A2A protocol.
+    /// Sends tasks between agents and retrieves results.
     /// </summary>
     public async Task<ResearchResultDto> ExecuteResearchViaA2AAsync(
         string query,
@@ -245,14 +245,14 @@ public class ResearchOrchestrator
         var sessionId = Guid.NewGuid().ToString();
 
         _logger.LogInformation(
-            "[Orchestrator:A2A] Araştırma başlıyor (A2A Mode)\n" +
-            "  Oturum: {SessionId}\n  Sorgu: '{Query}'",
+            "[Orchestrator:A2A] Research starting (A2A Mode)\n" +
+            "  Session: {SessionId}\n  Query: '{Query}'",
             sessionId, query);
 
         try
         {
             // ───────────────────────────────────────────────
-            // ADIM 1: Araştırmacı Ajan'a A2A Task gönder
+            // STEP 1: Send A2A Task to Researcher Agent
             // ───────────────────────────────────────────────
             var researchTask = new A2AAgentTask
             {
@@ -272,14 +272,14 @@ public class ResearchOrchestrator
                 }
             };
 
-            _logger.LogInformation("[Orchestrator:A2A] → Araştırmacı Ajan'a görev gönderiliyor...");
+            _logger.LogInformation("[Orchestrator:A2A] → Sending task to Researcher Agent...");
             var researchResult = await _a2aServer.HandleTaskAsync(
                 "researcher", researchTask, cancellationToken);
 
             var researchReport = ExtractTextFromArtifacts(researchResult);
 
             // ───────────────────────────────────────────────
-            // ADIM 2: Analiz Ajanı'na A2A Task gönder
+            // STEP 2: Send A2A Task to Analysis Agent
             // ───────────────────────────────────────────────
             var analysisTask = new A2AAgentTask
             {
@@ -308,7 +308,7 @@ public class ResearchOrchestrator
                 }
             };
 
-            _logger.LogInformation("[Orchestrator:A2A] → Analiz Ajanı'na görev gönderiliyor...");
+            _logger.LogInformation("[Orchestrator:A2A] → Sending task to Analysis Agent...");
             var analysisResult = await _a2aServer.HandleTaskAsync(
                 "analyst", analysisTask, cancellationToken);
 
@@ -347,7 +347,7 @@ public class ResearchOrchestrator
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "[Orchestrator:A2A] A2A pipeline hatası: {SessionId}", sessionId);
+            _logger.LogError(ex, "[Orchestrator:A2A] A2A pipeline error: {SessionId}", sessionId);
 
             return new ResearchResultDto
             {
@@ -355,7 +355,7 @@ public class ResearchOrchestrator
                 Query = query,
                 Status = "Failed",
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                AnalysisResult = $"A2A araştırma hatası: {ex.Message}"
+                AnalysisResult = $"A2A research error: {ex.Message}"
             };
         }
     }

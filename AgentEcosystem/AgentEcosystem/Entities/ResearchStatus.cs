@@ -1,23 +1,23 @@
 namespace AgentEcosystem.Entities;
 
 /// <summary>
-/// Araştırma durumu enum'ı.
-/// Bir araştırmanın yaşam döngüsündeki durumları temsil eder.
+/// Research status enum.
+/// Represents the states in the lifecycle of a research.
 /// </summary>
 public enum ResearchStatus
 {
-    /// <summary>Araştırma henüz başlamadı.</summary>
+    /// <summary>Research has not started yet.</summary>
     Pending = 0,
 
-    /// <summary>Araştırmacı Ajan veri topluyor.</summary>
+    /// <summary>Researcher Agent is collecting data.</summary>
     Researching = 1,
 
-    /// <summary>Analiz Ajanı verileri analiz ediyor.</summary>
+    /// <summary>Analysis Agent is analyzing the data.</summary>
     Analyzing = 2,
 
-    /// <summary>Araştırma başarıyla tamamlandı.</summary>
+    /// <summary>Research completed successfully.</summary>
     Completed = 3,
 
-    /// <summary>Araştırma sırasında hata oluştu.</summary>
+    /// <summary>An error occurred during the research.</summary>
     Failed = 4
 }

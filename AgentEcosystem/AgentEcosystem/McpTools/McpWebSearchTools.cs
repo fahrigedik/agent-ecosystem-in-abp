@@ -3,135 +3,177 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
 namespace AgentEcosystem.McpTools;
 
 /// <summary>
-/// MCP Web Arama Araçları — Model Context Protocol SDK ile entegre.
+/// MCP Web Search Tools — Tavily Search API integration.
 /// 
-/// Araştırmacı Ajan'ın web'de arama yapmasını sağlayan MCP araçları.
-/// Gerçek bir arama API'si (Bing, Google) entegre edilebilir.
-/// Şu an simüle edilmiş sonuçlar döner (demo amaçlı).
-/// 
-/// Üretim ortamında Bing Search API veya Google Custom Search 
-/// API key'i ile gerçek arama yapılabilir.
+/// Provides MCP tools that enable the Researcher Agent to search the web.
+/// Requires a valid Tavily API key configured in appsettings.json.
 /// </summary>
 [McpServerToolType]
 public class McpWebSearchTools
 {
     private readonly ILogger<McpWebSearchTools> _logger;
     private readonly HttpClient _httpClient;
+    private readonly string _tavilyApiKey;
 
     public McpWebSearchTools(
         ILogger<McpWebSearchTools> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _logger = logger;
         _httpClient = httpClientFactory.CreateClient("WebSearch");
+        _tavilyApiKey = configuration["Tavily:ApiKey"] ?? "";
     }
 
     /// <summary>
-    /// Web'de arama yapar ve sonuçları döner.
+    /// Searches the web and returns results.
+    /// Uses the Tavily Search API. Returns an error if the API key is not configured.
     /// </summary>
     [McpServerTool(Name = "web_search")]
-    [Description("Web'de arama yapar. Araştırma konusuyla ilgili güncel bilgileri toplar. Sonuçlar başlık, URL, snippet ve kaynak bilgisi içerir.")]
-    public Task<string> SearchAsync(
-        [Description("Arama sorgusu (örn: 'Python 3.13 yenilikleri')")] string query)
+    [Description("Searches the web. Gathers up-to-date information related to the research topic.")]
+    public async Task<string> SearchAsync(
+        [Description("Search query")] string query)
     {
-        _logger.LogInformation("[MCP:WebSearch] Arama yapılıyor: '{Query}'", query);
+        _logger.LogInformation("[MCP:WebSearch] Searching: '{Query}'", query);
 
-        var results = GenerateSearchResults(query);
+        if (string.IsNullOrEmpty(_tavilyApiKey))
+        {
+            _logger.LogWarning("[MCP:WebSearch] Tavily API key is not configured.");
+            return "Tavily API key is not configured. Please set 'Tavily:ApiKey' in appsettings.json.";
+        }
 
-        var output = $"Web Arama Sonuçları: '{query}'\n" +
-                     $"Arama Zamanı: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss UTC}\n" +
-                     $"Bulunan Sonuç: {results.Count}\n\n" +
-                     string.Join("\n\n", results.Select((r, i) =>
-                         $"{i + 1}. {r.Title}\n   URL: {r.Url}\n   Kaynak: {r.Source}\n   Özet: {r.Snippet}"));
+        var result = await SearchWithTavilyAsync(query);
+        if (result != null) return result;
 
-        _logger.LogInformation("[MCP:WebSearch] {Count} sonuç bulundu: '{Query}'",
-            results.Count, query);
-
-        return Task.FromResult(output);
+        return $"Tavily Search: No results found for '{query}'.";
     }
 
     /// <summary>
-    /// Belirtilen URL'nin içeriğini çeker.
+    /// Tavily Search API — a search API designed for AI agents.
+    /// POST https://api.tavily.com/search
     /// </summary>
-    [McpServerTool(Name = "fetch_url_content")]
-    [Description("Belirtilen URL'nin içeriğini çeker. Web sayfasının metin içeriğini döner.")]
-    public async Task<string> FetchUrlContentAsync(
-        [Description("İçeriği çekilecek URL")] string url)
+    private async Task<string?> SearchWithTavilyAsync(string query)
     {
         try
         {
-            _logger.LogInformation("[MCP:WebSearch] URL içeriği çekiliyor: {Url}", url);
+            _logger.LogInformation("[MCP:WebSearch] Searching with Tavily API...");
+
+            var requestBody = new
+            {
+                api_key = _tavilyApiKey,
+                query = query,
+                max_results = 10,
+                include_answer = true,
+                search_depth = "advanced"
+            };
+
+            var jsonContent = new StringContent(
+                JsonSerializer.Serialize(requestBody),
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.PostAsync("https://api.tavily.com/search", jsonContent);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[MCP:WebSearch] Tavily API {StatusCode}: {Body}",
+                    response.StatusCode, errorBody);
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+
+            var results = new List<SearchResult>();
+
+            if (doc.RootElement.TryGetProperty("results", out var items))
+            {
+                foreach (var item in items.EnumerateArray())
+                {
+                    results.Add(new SearchResult
+                    {
+                        Title = item.TryGetProperty("title", out var title)
+                            ? title.GetString() ?? "" : "",
+                        Url = item.TryGetProperty("url", out var url)
+                            ? url.GetString() ?? "" : "",
+                        Snippet = item.TryGetProperty("content", out var content)
+                            ? content.GetString() ?? "" : "",
+                        Source = item.TryGetProperty("url", out var src)
+                            ? new Uri(src.GetString() ?? "https://unknown").Host : "unknown"
+                    });
+                }
+            }
+
+            // Include Tavily's AI summary answer as well
+            var answer = doc.RootElement.TryGetProperty("answer", out var ans)
+                ? ans.GetString() : null;
+
+            _logger.LogInformation(
+                "[MCP:WebSearch] Tavily: {Count} results found for: '{Query}'",
+                results.Count, query);
+
+            if (results.Count == 0)
+                return $"Tavily Search: No results found for '{query}'.";
+
+            var formatted = FormatResults(query, results, "Tavily Search API");
+
+            if (!string.IsNullOrEmpty(answer))
+                formatted = $"AI Summary: {answer}\n\n{formatted}";
+
+            return formatted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[MCP:WebSearch] Tavily API error");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fetches the content of a specified URL.
+    /// </summary>
+    [McpServerTool(Name = "fetch_url_content")]
+    [Description("Fetches the content of a specified URL. Returns the text content of the web page.")]
+    public async Task<string> FetchUrlContentAsync(
+        [Description("URL to fetch content from")] string url)
+    {
+        try
+        {
+            _logger.LogInformation("[MCP:WebSearch] Fetching URL content: {Url}", url);
             var content = await _httpClient.GetStringAsync(url);
 
-            // İçeriği makul bir boyutta döndür
             if (content.Length > 5000)
-                content = content[..5000] + "\n\n[...içerik kısaltıldı...]";
+                content = content[..5000] + "\n\n[...content truncated...]";
 
             return content;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[MCP:WebSearch] URL içeriği çekme hatası: {Url}", url);
-            return $"URL içeriği çekilemedi ({url}): {ex.Message}";
+            _logger.LogError(ex, "[MCP:WebSearch] Error fetching URL content: {Url}", url);
+            return $"Failed to fetch URL content ({url}): {ex.Message}";
         }
     }
 
-    /// <summary>
-    /// Demo amaçlı simüle edilmiş arama sonuçları üretir.
-    /// Gerçek projede burada Bing Search API veya Google Custom Search kullanılır.
-    /// </summary>
-    private List<SearchResult> GenerateSearchResults(string query)
+    // ─── Helper Methods ───
+
+    private string FormatResults(string query, List<SearchResult> results, string source)
     {
-        return new List<SearchResult>
-        {
-            new()
-            {
-                Title = $"{query} - Kapsamlı Rehber ve Analiz",
-                Url = $"https://docs.example.com/{Uri.EscapeDataString(query)}",
-                Snippet = $"Bu kapsamlı rehber, {query} konusunu tüm yönleriyle ele almaktadır. " +
-                          "En güncel bilgiler ve profesyonel analizler bu kaynakta bulunmaktadır.",
-                Source = "docs.example.com"
-            },
-            new()
-            {
-                Title = $"{query} - Son Gelişmeler 2026",
-                Url = $"https://blog.example.com/{Uri.EscapeDataString(query)}-2026",
-                Snippet = $"2026 yılında {query} alanındaki en son gelişmeler, yenilikler ve " +
-                          "değişiklikler hakkında detaylı bilgi.",
-                Source = "blog.example.com"
-            },
-            new()
-            {
-                Title = $"{query} - Resmi Dokümantasyon",
-                Url = $"https://official.example.com/{Uri.EscapeDataString(query)}",
-                Snippet = $"Resmi {query} dokümantasyonu. Kurulum, yapılandırma ve " +
-                          "kullanım kılavuzu bu kaynakta yer almaktadır.",
-                Source = "official.example.com"
-            },
-            new()
-            {
-                Title = $"{query} - Topluluk Tartışmaları ve Görüşler",
-                Url = $"https://forum.example.com/topic/{Uri.EscapeDataString(query)}",
-                Snippet = $"Geliştiricilerin {query} hakkındaki deneyimleri, karşılaştıkları " +
-                          "sorunlar ve çözüm önerileri.",
-                Source = "forum.example.com"
-            },
-            new()
-            {
-                Title = $"{query} - Karşılaştırmalı Analiz ve Benchmark",
-                Url = $"https://analysis.example.com/{Uri.EscapeDataString(query)}",
-                Snippet = $"{query} konusunda detaylı karşılaştırma, performans testleri " +
-                          "ve benchmark sonuçları.",
-                Source = "analysis.example.com"
-            }
-        };
+        return $"Web Search Results: '{query}'\n" +
+               $"Source: {source}\n" +
+               $"Search Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss UTC}\n" +
+               $"Results Found: {results.Count}\n\n" +
+               string.Join("\n\n", results.Select((r, i) =>
+                   $"{i + 1}. {r.Title}\n   URL: {r.Url}\n   Source: {r.Source}\n   Summary: {r.Snippet}"));
     }
 
     private class SearchResult
